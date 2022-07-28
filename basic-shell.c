@@ -10,6 +10,7 @@
 #include <stdlib.h> 
 #include <unistd.h> 
 #include <limits.h> 
+#include <sys/wait.h> 
 
 #define MAX_ARGC 10
 
@@ -82,6 +83,19 @@ int whoami()
     return 0; 
 }
 
+int cd()
+{
+    if (argv[1] == NULL) {
+        return chdir(getenv("HOME")); 
+    }
+    return chdir(argv[1]); 
+}
+
+void null_out_array()
+{
+    for (int i=0; i < MAX_ARGC; i++) argv[i] = NULL; 
+}
+
 int main()
 {
     // signal(SIGINT, SIG_IGN);
@@ -98,15 +112,23 @@ int main()
             isBackground = 1; 
 
         //print_args();    
-        print_args(); 
+        
         if (!strcmp(argv[0], "pwd")) {
             pwd();
         } else if (!strcmp(argv[0], "whoami")) {
             whoami();
+        } else if (!strcmp(argv[0],"cd")){
+            cd(); 
         } else {
-            printf("%s Not implemented\n",argv[0]); 
+            pid_t pid = fork(); 
+            if (pid == 0) {
+                execlp(argv[0],argv[1]);  
+            } else {
+                waitpid(-1,0,0); 
+            }
         }
         fflush(NULL); 
+        null_out_array(); 
     }
     return 0; 
 }
