@@ -13,10 +13,10 @@ References :
 - https://www.cs.cmu.edu/afs/cs/academic/class/15213-s02/www/applications/labs/lab5/shlab.html
 
 Todo: 
-[x] Add more command implementation or simple execve the existing system binaries (that exist in PATH)
-- Understand how to make parser using lex and yacc and implementing it in this project.  
-- Add history and autocomplete 
-- Add 256 color support
-- Try to understand about how to write grammar in backus naur format
+- [x] Add more command implementation or simple execve the existing system binaries (that exist in PATH)
+- [ ] Understand how to make parser using lex and yacc and implementing it in this project.  
+- [ ] Add history and autocomplete 
+- [ ] Add 256 color support
+- [ ] Try to understand about how to write grammar in backus naur format
 
 
