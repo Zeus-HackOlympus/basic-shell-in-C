@@ -18,5 +18,4 @@ Todo:
 - [ ] Add history and autocomplete 
 - [ ] Add 256 color support
 - [ ] Try to understand about how to write grammar in backus naur format
-
-
+- [ ] Add Makefile 

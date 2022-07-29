@@ -11,12 +11,17 @@
 #include <unistd.h> 
 #include <limits.h> 
 #include <sys/wait.h> 
+#include <sys/prctl.h>
 
 #define MAX_ARGC 10
+#define ANSI_RED "\e[0;31m"
+
 
 int argc ; 
-char *argv[MAX_ARGC] = {NULL};  
+char *argv[MAX_ARGC+1] = {NULL};  
 int isBackground = 0; 
+int return_successful = 1; 
+
 
 void print_prompt()
 {
@@ -27,15 +32,25 @@ void print_prompt()
     fflush(NULL); 
 }
 
+void print_prompt_err()
+{
+    char cwd[PATH_MAX+5];
+    getcwd(cwd, PATH_MAX); 
+    strcat(cwd,ANSI_RED "% ");
+    printf("%s",cwd); 
+    fflush(NULL); 
+}
+
 int take_input()
 {
     /* take input and split it into tokens */
     /* returns the number of args passed */ 
     
     char line[PATH_MAX]; // THIS IS A BUG //
+ 
+    if (!fgets(line,sizeof line,stdin))   
+        return 0;  
     
-    if (!fgets(line,sizeof line,stdin)) 
-        return 0; 
     line[strcspn(line, "\n")] = 0; // remove trailing new line
     fflush(stdin); 
     /* split input into tokens for argv */ 
@@ -61,6 +76,23 @@ void print_args()
     puts(""); 
 }
 
+int cd()
+{
+    if (argv[1] == NULL) {
+        return chdir(getenv("HOME")); 
+    }
+    return chdir(argv[1]); 
+}
+
+int whoami()
+{
+    int uid = getuid(); 
+    char *username = getlogin(); 
+    if (username == NULL) return -1; 
+    printf("%d(%s)\n", uid,username); 
+    return 0; 
+}
+
 int pwd()
 {
     /* print working directory */
@@ -68,27 +100,10 @@ int pwd()
     char cwd[PATH_MAX];
     if ((getcwd(cwd, PATH_MAX)) != NULL) {
         printf("%s\n",cwd);
-    }
-    else {
+    } else {
         return -1; 
     }
     return 0; 
-}
-
-int whoami()
-{
-    int uid = getuid(); 
-    char *username = getlogin(); 
-    printf("%d(%s)\n", uid,username); 
-    return 0; 
-}
-
-int cd()
-{
-    if (argv[1] == NULL) {
-        return chdir(getenv("HOME")); 
-    }
-    return chdir(argv[1]); 
 }
 
 void null_out_array()
@@ -100,8 +115,15 @@ int main()
 {
     // signal(SIGINT, SIG_IGN);
     while(1) {
-        print_prompt(); 
-        argc = take_input();
+        int status, return_code; 
+        if (return_successful) {
+            print_prompt(); 
+        } else {
+            print_prompt_err(); 
+        }
+        argc = take_input();    
+
+        /* BUG: Pressing enter will result in exit. Have to do something about exiting with only ^D*/
         if (argc == 0) {
             puts("Exiting..."); 
             exit(0); 
@@ -114,17 +136,46 @@ int main()
         //print_args();    
         
         if (!strcmp(argv[0], "pwd")) {
-            pwd();
+            pid_t pid = fork(); 
+            if (pid == 0) {
+                return_code = pwd();  
+                exit(return_code); 
+            } else {
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+                waitpid(pid,&status,0); 
+                if (!WIFEXITED(status)) 
+                    return_successful = 0; // child didn't return successfully 
+            } 
         } else if (!strcmp(argv[0], "whoami")) {
-            whoami();
+            pid_t pid = fork(); 
+            if (pid == 0) {
+                return_code = whoami();
+                exit(return_code); 
+            } else {
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+                waitpid(pid,&status,0); 
+                if (!WIFEXITED(status)) 
+                    return_successful = 0; 
+            }
         } else if (!strcmp(argv[0],"cd")){
-            cd(); 
+            pid_t pid = fork(); 
+            if (pid == 0) {
+                return_code = cd(); 
+                exit(return_code); 
+            }  else {
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+                waitpid(pid,&status,0);
+                if (!WIFEXITED(status)) 
+                    return_successful = 0; 
+            }
         } else {
             pid_t pid = fork(); 
             if (pid == 0) {
-                execlp(argv[0],argv[1]);  
+                return_code = execlp(argv[0],argv[1]);  
+                exit(return_code); 
             } else {
-                waitpid(-1,0,0); 
+                prctl(PR_SET_PDEATHSIG, SIGHUP);
+                waitpid(pid,&status,0); 
             }
         }
         fflush(NULL); 
